@@ -1,0 +1,257 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:email="http://www.mulesoft.org/schema/mule/email" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/email http://www.mulesoft.org/schema/mule/email/current/mule-email.xsd">
+	<flow name="ImplementationFlow" doc:id="f03773f7-a9c3-41bc-9914-3807538df246" >
+		<logger level="INFO" doc:name="START" doc:id="26c5724e-59d3-4b97-a33f-e69a3098a6ae" message='"Application Start"'/>
+		<set-variable value="#[true]" doc:name="continue" doc:id="eba7f769-0b1d-48cb-b083-5469f22685a6" variableName="continue"/>
+		<choice doc:name="Choice" doc:id="952834fd-6aa1-44b9-a163-dcb40f188773" >
+			<when expression="#[isEmpty(message.payload.toEmail) == false]">
+				<choice doc:name="Choice" doc:id="6ee66d0f-ab0a-4407-8065-3cc9ac5cef70" >
+					<when expression='#[message.payload.toEmail contains(",")]'>
+						<set-variable value="#[message.payload.toEmail default &quot;&quot; splitBy ',']" doc:name="toEmail" doc:id="963d6e4e-e6ba-4182-b9ef-a1006c0ec68c" variableName="toEmail"/>
+					</when>
+					<otherwise >
+						<set-variable value="#[[message.payload.toEmail]]" doc:name="toEmail" doc:id="f69474da-615d-4976-b1fb-3388001e760b" variableName="toEmail"/>
+					</otherwise>
+				</choice>
+			</when>
+			<otherwise >
+				<set-variable value="" doc:name="To Email value " doc:id="abc19671-a37d-4cb0-a53d-8a8f4e594fb7" variableName="toEmail"/>
+			</otherwise>
+		</choice>
+		<choice doc:name="Choice" doc:id="390e4215-2ab6-4f34-a1ff-3dd03023dd00" >
+			<when expression="#[isEmpty(message.payload.ccEmail) == false]">
+				<choice doc:name="Choice" doc:id="0ff336c6-9afd-400e-89bf-f36ed5185f3d" >
+					<when expression='#[message.payload.ccEmail contains(",")]'>
+						<set-variable value="#[message.payload.ccEmail default &quot;&quot; splitBy ',']" doc:name="ccEmail" doc:id="8bc198b1-fa6d-4079-87e2-82f1e4e98aea" variableName="ccEmail"/>
+					</when>
+					<otherwise >
+						<set-variable value="#[[message.payload.ccEmail]]" doc:name="ccEmail" doc:id="55e50b0d-22fe-4459-9726-e8e39235a735" variableName="ccEmail"/>
+					</otherwise>
+				</choice>
+			</when>
+			<otherwise >
+				<set-variable value="" doc:name="ccEmail" doc:id="86557f1e-4ab2-4539-9668-ecb82918f0d5" variableName="ccEmail"/>
+			</otherwise>
+		</choice>
+		<choice doc:name="Choice" doc:id="b2ddfb72-0608-4b12-9201-126967bcb4db" >
+			<when expression="#[isEmpty(message.payload.attachment) == false]">
+				<set-variable value="#[message.payload.attachment]" doc:name="attachment" doc:id="86ddef2c-03b7-4e53-ac2e-db65976e7b53" variableName="attachment"/>
+			</when>
+			<otherwise >
+				<set-variable value="" doc:name="attachment" doc:id="77248d37-42f1-4232-b236-eca375c1b6fd" variableName="attachment"/>
+			</otherwise>
+		</choice>
+		<choice doc:name="Choice" doc:id="0a488dfc-5845-46dd-8494-41df456d3e46" >
+			<when expression="#[isEmpty(vars.attachment) == false]">
+				<choice doc:name="Choice" doc:id="c2ca6728-601d-4817-bd48-c61e05b57c20" >
+					<when expression="#[isEmpty(vars.toEmail) == false and isEmpty(vars.ccEmail) == false]">
+						<ee:transform doc:name="Transform Message" doc:id="e75b0a4b-347c-4f5e-8d0c-3cedd7d67494" >
+							<ee:message >
+								<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"personalizations": [
+		{
+			"to": vars.toEmail as Array map ((item, index) -> {
+     			"email": item as String
+		     }),
+			"cc": vars.ccEmail as Array map ((item, index) -> {
+     			"email": item as String
+		     })
+		}
+	],
+	"from": {
+		"email": message.payload.fromEmail as String
+	},
+	"subject":  message.payload.subject,
+	"content": [
+		{
+			"type": "text/plain",
+			"value": message.payload.message
+		}
+	],
+	"attachments": [
+		{
+			"content": vars.attachment.content,
+			"type": vars.attachment.filetype,
+			"filename":  vars.attachment.filename
+		}
+	]
+}]]></ee:set-payload>
+							</ee:message>
+						</ee:transform>
+					</when>
+					<when expression="#[isEmpty(vars.toEmail) == false]">
+						<ee:transform doc:name="Transform Message" doc:id="6022e7fc-1c8f-40ed-85b3-85e277c9499e">
+							<ee:message>
+								<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"personalizations": [
+		{
+			"to": vars.toEmail as Array map ((item, index) -> {
+     			"email": item as String
+		     })
+		}
+	],
+	"from": {
+		"email": message.payload.fromEmail as String
+	},
+	"subject":  message.payload.subject,
+	"content": [
+		{
+			"type": "text/plain",
+			"value": message.payload.message
+		}
+	],
+	"attachments": [
+		{
+			"content": vars.attachment.content,
+			"type": vars.attachment.filetype,
+			"filename":  vars.attachment.filename
+		}
+	]
+}]]></ee:set-payload>
+							</ee:message>
+						</ee:transform>
+					</when>
+					<otherwise >
+						<set-variable value="#[false]" doc:name="continue" doc:id="306d8042-0be5-40b6-92cd-3ceaa19fbe4c" variableName="continue"/>
+						<logger level="INFO" doc:name="No email addresses" doc:id="84cb5a29-ba93-4fbd-ae42-4eefe63e9fb7" message='"No email addresses"'/>
+					</otherwise>
+				</choice>
+			</when>
+			<otherwise >
+				<choice doc:name="Choice" doc:id="324e9ddb-202a-4966-a8fa-da3e25637f04" >
+					<when expression="#[isEmpty(vars.toEmail) == false and isEmpty(vars.ccEmail) == false]">
+						<ee:transform doc:name="Transform Message" doc:id="57614ace-06cc-474b-9d75-61add8ae30e2" >
+							<ee:message >
+								<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"personalizations": [
+		{
+			"to": vars.toEmail as Array map ((item, index) -> {
+     			"email": item as String
+		     }),
+			"cc": vars.ccEmail as Array map ((item, index) -> {
+     			"email": item as String
+		     })
+		}
+	],
+	"from": {
+		"email": message.payload.fromEmail as String
+	},
+	"subject":  message.payload.subject,
+	"content": [
+		{
+			"type": "text/plain",
+			"value": message.payload.message
+		}
+	]
+}]]></ee:set-payload>
+							</ee:message>
+						</ee:transform>
+					</when>
+					<when expression="#[isEmpty(vars.toEmail) == false]">
+						<ee:transform doc:name="Transform Message" doc:id="d3d18bb5-b16f-4efa-8129-51fe4b7fea09" >
+							<ee:message >
+								<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"personalizations": [
+		{
+			"to": vars.toEmail as Array map ((item, index) -> {
+     			"email": item as String
+		     })
+		}
+	],
+	"from": {
+		"email": message.payload.fromEmail as String
+	},
+	"subject":  message.payload.subject,
+	"content": [
+		{
+			"type": "text/plain",
+			"value": message.payload.message
+		}
+	]
+}]]></ee:set-payload>
+							</ee:message>
+						</ee:transform>
+					</when>
+					<otherwise >
+						<set-variable value="#[false]" doc:name="continue" doc:id="628a76ba-ff30-4bf0-bb14-c92929bec6be" variableName="continue"/>
+						<logger level="INFO" doc:name="No email addresses" doc:id="5b5630dd-ca32-4bff-a90f-e75d1a66f7fc" message='"No email addresses"'/>
+					</otherwise>
+				</choice>
+			</otherwise>
+		</choice>
+		<choice doc:name="Choice" doc:id="811b6e15-41f8-4a97-9897-2496d3847d9b" >
+			<when expression="#[vars.continue == true]">
+				<choice doc:name="Choice" doc:id="6d8656b1-4395-4c3a-91a9-79e58c45e2dc" >
+					<when expression="#[Mule::p('showPayload') == 'ON']">
+						<logger level="INFO" doc:name="Logger" doc:id="ecfee3e1-4376-4500-9d6e-fdb4593a5572" />
+					</when>
+				</choice>
+				<try doc:name="Try" doc:id="7f332972-c982-42c5-aca4-67322406c436" >
+					<email:send doc:name="Send" doc:id="19d22151-cb56-452b-8ed9-868d3815da89" fromAddress="${email.fromAddress}" config-ref="Email_SMTP" subject="Hi">
+						<email:to-addresses >
+							<email:to-address value="${email.toAddress}" />
+						</email:to-addresses>
+						<email:cc-addresses />
+					</email:send>
+					<error-handler >
+						<on-error-propagate enableNotifications="true" logException="true" doc:name="On Error Propagate" doc:id="53cb1df8-a75d-40cf-893b-fa7e52e2cf8e" >
+							<logger level="INFO" doc:name="Email Error" doc:id="519e5964-c920-4e23-896c-cc083c1a3709" message='#["SG ERROR"]'/>
+						</on-error-propagate>
+					</error-handler>
+				</try>
+				<choice doc:name="Choice" doc:id="d7556e44-f20b-4888-8dcd-f0579eaffdc3">
+			<when expression="#[attributes.'statusCode' == 202]">
+						<logger level="INFO" doc:name="Email Sent Successfully" doc:id="72250432-ab32-486b-8c00-9ecf29ad9b2c" message='"email send successful"'/>
+					</when>
+					<otherwise >
+						<logger level="INFO" doc:name="ERROR" doc:id="3525444f-9f72-4d80-819d-1a637db2d6f2" message='#["SG ERROR"]'/>
+					</otherwise>
+		</choice>
+				<ee:transform doc:name="Success Response" doc:id="090d6914-8f36-4893-8946-557c888171ad">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+  "success": true
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+			</when>
+			<otherwise >
+				<ee:transform doc:name="Transform Message" doc:id="edf7be2c-52bb-4dd0-bd93-355ee61f8c20" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+  "success": false
+}]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+			</otherwise>
+		</choice>
+		<error-handler >
+			<on-error-continue enableNotifications="true" logException="true" doc:name="On Error Continue" doc:id="762f25a3-31b1-433a-baa7-075d1b06d55a" >
+				<logger level="INFO" doc:name="ERROR" doc:id="4349aa87-3f93-4cb6-93a1-c1e3ca7f45b0" message='#["Error: " ++ error.description as String default ""]'/>
+			</on-error-continue>
+		</error-handler>
+	</flow>
+</mule>
