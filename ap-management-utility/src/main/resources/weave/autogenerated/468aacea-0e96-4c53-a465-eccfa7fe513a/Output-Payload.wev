@@ -1,0 +1,18 @@
+%dw 2.0
+
+type auto_468aacea_0e96_4c53_a465_eccfa7fe513a_Output_Payload = {
+  businessGroups: Array<{    environments: Array<{      name: String,       id: String,       _?: Any    }>, 
+    name: String, 
+    available: {
+      staticIps: Number, 
+      vCoresSandbox: Number, 
+      vCoresProduction: Number, 
+      vCoresDesign: Number, 
+      _?: Any
+    } {"description": "The entitlements that are currently available for the business group. This is the difference between the \"assigned\" entitlement to the business group and the \"reassigned\" entitlements to the child business groups"}, 
+    id: String, 
+    _?: Any
+  }>, 
+  _?: Any
+} {"description": "The platform business group and environment information"}
+

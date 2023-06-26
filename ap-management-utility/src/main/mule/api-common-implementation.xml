@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+	<sub-flow name="common-completion-sub-flow" doc:id="b41f71bf-5275-45e6-8a12-5dc69fadbf20" >
+		<choice doc:name="Choice" doc:id="de5bf055-833c-4e9e-bc9d-bba4f076231e">
+			<when expression="#[vars.acceptHeader == 'application/csv']">
+				<ee:transform doc:name="Transform to CSV" doc:id="e7e6f6b1-f7ed-4fed-aa3f-5583cb8d57de">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+output application/csv
+---
+payload[0]]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+			</when>
+			<otherwise>
+				<ee:transform doc:name="Transform to JSON" doc:id="c0b128a1-fc08-41f9-969d-9d34426b547e">
+					<ee:message>
+						<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+			</otherwise>
+		</choice>
+	</sub-flow>
+
+	<sub-flow name="common-invocation-sub-flow" doc:id="468aacea-0e96-4c53-a465-eccfa7fe513a" >
+		<set-variable value="#[attributes.headers['Authorization']]" doc:name="Get Authorization Header" doc:id="f0125061-0fc4-45c9-9a89-4a129dd8efad" variableName="authorizationHeader"/>
+		<set-variable value="#[attributes.headers['Accept'] default 'application/json']" doc:name="Get Accept Header" doc:id="b73d1835-1a6b-4cd1-a881-4b624d4adc17" variableName="acceptHeader"/>
+		<set-variable value="#[attributes.method]" doc:name="Get Method" doc:id="eb2cba73-bbe8-4848-bda8-b514ddfafc71" variableName="requestMethod" />
+		<set-variable value="#[attributes.queryParams['businessGroups']]" doc:name="Get Business Group Filter" doc:id="3ac1d2ce-493c-487c-8e3c-517680c06498" variableName="businessGroupFilter"/>
+		<set-variable value="#[attributes.queryParams['environments']]" doc:name="Get Environment Filter" doc:id="92e1636b-058b-4447-af7c-da3de5c1fe55" variableName="environmentFilter"/>
+		<set-variable value="#[attributes.queryParams['applications']]" doc:name="Get Application Filter" doc:id="452aeefa-3a97-4e64-9776-ec7f38c3c4f7" variableName="applicationFilter"/>
+	
+</sub-flow>
+	<sub-flow name="common-error-handling-sub-flow" doc:id="4adc4d8a-7136-4ea0-b6ab-cdd0dc5f22fd" >
+		<ee:transform doc:id="e3bbfb0d-fc0d-4d32-a682-76e561f99d51">
+		  <ee:message>
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+  "timestamp": now(),
+  "api": app.name,
+  "code": vars.httpStatus,
+  "message": error.errorType.identifier,
+  "details": error.detailedDescription
+}]]></ee:set-payload>
+		  </ee:message>
+		  <ee:variables />
+		</ee:transform>
+		<logger level="INFO" doc:name="Logger" doc:id="6e3e476d-c9c5-43d0-9017-bf52b4eda2cd" message='#[output application/json&#10;---&#10;{&#10;	"failedPayload": if (error.errorMessage != null) (error.errorMessage.payload default "")&#10;								else ""&#10;}]' />
+	</sub-flow>
+	<error-handler name="common-anypoint-platform-management-error-handler" doc:id="8a0586c0-f5a8-4913-8640-38a634926455" >
+		<on-error-propagate type="APIKIT:BAD_REQUEST">
+		  <set-variable value="400" doc:name="Set Variable" doc:id="25f56b32-4889-46e1-a17e-d7c65dc8d62a" variableName="httpStatus" />
+		  <flow-ref doc:name="Common Error Handling" doc:id="78f32d19-6587-474a-a21e-05acba0ee582" name="common-error-handling-sub-flow"/>
+		</on-error-propagate>
+		<on-error-propagate type="APIKIT:NOT_FOUND">
+		  <set-variable value="404" doc:name="Set Variable" doc:id="e420c8b3-c523-4a1c-bf03-23b82e10fc1a" variableName="httpStatus" />
+		  <flow-ref doc:name="Common Error Handling" doc:id="ae4a5151-ce00-4f95-b68f-15017aedf64a" name="common-error-handling-sub-flow"/>
+		</on-error-propagate>
+		<on-error-propagate type="APIKIT:METHOD_NOT_ALLOWED">
+		  <set-variable value="405" doc:name="Set Variable" doc:id="8ea4a0a8-6c8e-433a-9eab-e6f5bb6d79c8" variableName="httpStatus" />
+		  <flow-ref doc:name="Common Error Handling" doc:id="8a19b870-ac88-4bed-8bcd-d34075660cbe" name="common-error-handling-sub-flow"/>
+		</on-error-propagate>
+		<on-error-propagate type="APIKIT:NOT_ACCEPTABLE">
+		  <set-variable value="406" doc:name="Set Variable" doc:id="8bd8f1ac-9b16-46d0-8079-8507e9d61ef9" variableName="httpStatus" />
+		  <flow-ref doc:name="Common Error Handling" doc:id="fa2d043b-2391-4a65-b335-e10825e072f1" name="common-error-handling-sub-flow"/>
+		</on-error-propagate>
+		<on-error-propagate type="APIKIT:UNSUPPORTED_MEDIA_TYPE">
+		  <set-variable value="415" doc:name="Set Variable" doc:id="713e63b7-66bb-4c72-8e96-8ad9d3e5256d" variableName="httpStatus" />
+		  <flow-ref doc:name="Common Error Handling" doc:id="44d26bdf-4012-47de-8f8f-5a3c9910db7d" name="common-error-handling-sub-flow"/>
+		</on-error-propagate>
+		<on-error-propagate type="HTTP:TIMEOUT">
+		  <set-variable value="504" doc:name="Set Variable" doc:id="a5fad638-f8b9-48a9-ad0e-0af9b04ba329" variableName="httpStatus" />
+		  <flow-ref doc:name="Common Error Handling" doc:id="0f7d0730-fdea-45a2-bf99-3e071c8ffcc2" name="common-error-handling-sub-flow"/>
+		</on-error-propagate>
+		<on-error-propagate type="HTTP:*">
+		  <set-variable value="502" doc:name="Set Variable" doc:id="8be60619-11b3-4046-a408-6c9d89064d67" variableName="httpStatus" />
+		  <flow-ref doc:name="Common Error Handling" doc:id="8fb8dc9f-c968-417f-8687-e1f6d7fdec18" name="common-error-handling-sub-flow"/>
+		</on-error-propagate>
+		<on-error-propagate type="ANY">
+		  <set-variable value="500" doc:name="Set Variable" doc:id="323fdeb1-a7f1-4436-8579-d85dbbf39d66" variableName="httpStatus" />
+		  <flow-ref doc:name="Common Error Handling" doc:id="292b7e04-69c7-432e-a13e-ef675bba106b" name="common-error-handling-sub-flow"/>
+		</on-error-propagate>
+	</error-handler>
+</mule>

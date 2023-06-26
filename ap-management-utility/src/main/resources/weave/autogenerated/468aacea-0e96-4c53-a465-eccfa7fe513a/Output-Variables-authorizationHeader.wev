@@ -1,0 +1,4 @@
+%dw 2.0
+
+type auto_468aacea_0e96_4c53_a465_eccfa7fe513a_Output_Variables_authorizationHeader = Any
+

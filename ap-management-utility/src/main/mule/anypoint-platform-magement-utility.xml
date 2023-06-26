@@ -1,0 +1,234 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:apikit="http://www.mulesoft.org/schema/mule/mule-apikit" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd http://www.mulesoft.org/schema/mule/mule-apikit http://www.mulesoft.org/schema/mule/mule-apikit/current/mule-apikit.xsd http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd ">
+    <http:listener-config name="anypoint-platform-magement-utility-httpListenerConfig">
+        <http:listener-connection host="0.0.0.0" port="8081" />
+    </http:listener-config>
+    <apikit:config name="anypoint-platform-magement-utility-config" api="resource::39922f36-192c-4999-8356-7a28b157c815:anypoint-platform-magement-utility:1.0.0:raml:zip:anypoint-platform-magement-utility.raml" outboundHeadersMapName="outboundHeaders" httpStatusVarName="httpStatus" />
+    <flow name="anypoint-platform-magement-utility-main">
+        <http:listener path="/api/*" config-ref="anypoint-platform-magement-utility-httpListenerConfig">
+            <http:response statusCode="#[vars.httpStatus default 200]">
+                <http:headers><![CDATA[#[vars.outboundHeaders default {}]]]></http:headers>
+            </http:response>
+            <http:error-response statusCode="#[vars.httpStatus default 500]">
+                <http:body><![CDATA[#[payload]]]></http:body>
+                <http:headers><![CDATA[#[vars.outboundHeaders default {}]]]></http:headers>
+            </http:error-response>
+        </http:listener>
+        <apikit:router config-ref="anypoint-platform-magement-utility-config" />
+        <error-handler>
+            <on-error-propagate type="APIKIT:BAD_REQUEST">
+                <ee:transform doc:name="Transform Message">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{message: "Bad request"}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus">400</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </on-error-propagate>
+            <on-error-propagate type="APIKIT:NOT_FOUND">
+                <ee:transform doc:name="Transform Message">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{message: "Resource not found"}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus">404</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </on-error-propagate>
+            <on-error-propagate type="APIKIT:METHOD_NOT_ALLOWED">
+                <ee:transform doc:name="Transform Message">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{message: "Method not allowed"}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus">405</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </on-error-propagate>
+            <on-error-propagate type="APIKIT:NOT_ACCEPTABLE">
+                <ee:transform doc:name="Transform Message">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{message: "Not acceptable"}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus">406</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </on-error-propagate>
+            <on-error-propagate type="APIKIT:UNSUPPORTED_MEDIA_TYPE">
+                <ee:transform doc:name="Transform Message">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{message: "Unsupported media type"}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus">415</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </on-error-propagate>
+            <on-error-propagate type="APIKIT:NOT_IMPLEMENTED">
+                <ee:transform doc:name="Transform Message">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{message: "Not Implemented"}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus">501</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </on-error-propagate>
+        </error-handler>
+    </flow>
+    <flow name="anypoint-platform-magement-utility-console">
+        <http:listener path="/console/*" config-ref="anypoint-platform-magement-utility-httpListenerConfig">
+            <http:response statusCode="#[vars.httpStatus default 200]">
+                <http:headers><![CDATA[#[vars.outboundHeaders default {}]]]></http:headers>
+            </http:response>
+            <http:error-response statusCode="#[vars.httpStatus default 500]">
+                <http:body><![CDATA[#[payload]]]></http:body>
+                <http:headers><![CDATA[#[vars.outboundHeaders default {}]]]></http:headers>
+            </http:error-response>
+        </http:listener>
+        <apikit:console config-ref="anypoint-platform-magement-utility-config" />
+        <error-handler>
+            <on-error-propagate type="APIKIT:NOT_FOUND">
+                <ee:transform doc:name="Transform Message">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{message: "Resource not found"}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus">404</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </on-error-propagate>
+        </error-handler>
+    </flow>
+    <flow name="patch:\runtime-plane\(deployment-type)\applications:application\json:anypoint-platform-magement-utility-config">
+		<flow-ref doc:name="Common-invocation" doc:id="128d7b2e-ca49-4195-aa29-5ed15ee336c7" name="common-invocation-sub-flow"/>
+		<ee:transform doc:name="Transform Message">
+            <ee:variables>
+                <ee:set-variable variableName="deployment-type">attributes.uriParams.'deployment-type'</ee:set-variable>
+            </ee:variables>
+        </ee:transform>
+        <logger level="INFO" message="patch:\runtime-plane\(deployment-type)\applications:application\json:anypoint-platform-magement-utility-config" />
+    </flow>
+    <flow name="get:\runtime-plane\(deployment-type)\applications:anypoint-platform-magement-utility-config">
+        <flow-ref doc:name="Common-invocation" doc:id="f1aa1b0c-78ea-47ef-a03b-7353eeb0c4ed" name="common-invocation-sub-flow"/>
+		<ee:transform doc:name="Transform Message">
+            <ee:variables>
+                <ee:set-variable variableName="deployment-type">attributes.uriParams.'deployment-type'</ee:set-variable>
+            </ee:variables>
+        </ee:transform>
+        <logger level="INFO" message="get:\runtime-plane\(deployment-type)\applications:anypoint-platform-magement-utility-config" />
+    </flow>
+    <flow name="get:\management-plane\info:anypoint-platform-magement-utility-config">
+        <flow-ref doc:name="Common-Invocation" doc:id="d5b70309-f4ac-4d74-9301-7327b50909da" name="common-invocation-sub-flow"/>
+		<flow-ref doc:name="Flow Reference" doc:id="1e955b6f-8a86-4c7e-bc17-98006016fe13" name="get-info-flow"/>
+		<logger level="INFO" message="get:\management-plane\info:anypoint-platform-magement-utility-config" />
+    </flow>
+    <flow name="get:\management-plane\users:anypoint-platform-magement-utility-config">
+        <logger level="INFO" message="get:\management-plane\users:anypoint-platform-magement-utility-config" />
+    </flow>
+    <flow name="post:\management-plane\assets\migrate\commit:application\json:anypoint-platform-magement-utility-config">
+       <flow-ref doc:name="Common Invocation" doc:id="3f0f9632-6b27-43b7-92eb-6903bf1f6e3e" name="common-invocation-sub-flow" />
+        <set-variable value="commit" doc:name="Set Confirmation Type" doc:id="7820cb06-396f-44c8-8e28-6724f49b0d32" variableName="confirmationType" />
+        <async doc:name="Async" doc:id="e8138af1-f000-409d-8f89-3b71f29885a0">
+            <flow-ref doc:name="Post Assets Migrate - Commit" doc:id="9e76c58d-453f-4902-acf7-8d69c73163e9" name="post-assets-migrate-rollback-or-commit-flow" />
+        </async>
+        <ee:transform doc:name="Transform Message" doc:id="df53fbf6-6748-44a1-8632-9fd82c61a64f">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"status": "Asset Migration - Commit in progress. Use " ++ correlationId ++ " to search the logs"
+}]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+    </flow>
+    <flow name="post:\management-plane\assets\copy:application\json:anypoint-platform-magement-utility-config">
+        <flow-ref doc:name="Common Invocation" doc:id="be0bd6f0-06c1-4292-9541-2ecc7972c637" name="common-invocation-sub-flow" />
+        <async doc:name="Async" doc:id="a5b76311-37be-4979-b883-ba44d7ae72c3">
+            <flow-ref doc:name="Post Assets Copy" doc:id="0fed5c22-63c0-4b43-bcfd-8f587eb33a66" name="post-assets-copy-flow" />
+        </async>
+        <ee:transform doc:name="Transform Message" doc:id="70b83203-bb83-4f98-9be2-993c27e3bc4e">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"status": "Asset Copy in progress. Use " ++ correlationId ++ " to search the logs"
+}]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+    </flow>
+    <flow name="post:\management-plane\assets\migrate:application\json:anypoint-platform-magement-utility-config">
+        <flow-ref doc:name="Common-invocation" doc:id="6ff8fbb9-3b71-4e11-9e97-f5c47ed9f07d" name="common-invocation-sub-flow"/>
+		<async doc:name="Async" doc:id="588bdc39-b4aa-4191-a674-a477326d223f">
+            <flow-ref doc:name="Post Assets Migrate" doc:id="32b49522-a52b-4dfe-8515-3a3df8a00d52" name="post-assets-migrate-flow" />
+        </async>
+        <ee:transform doc:name="Transform Message" doc:id="7f681168-2265-40e4-af05-26d433810e79">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"status": "Asset Migration in progress. Use " ++ correlationId ++ " to search the logs"
+}]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+    </flow>
+    <flow name="post:\management-plane\assets\purge:application\json:anypoint-platform-magement-utility-config">
+        <flow-ref doc:name="Common Invocation" doc:id="f553203f-4736-466b-8d93-1c334b6d7421" name="common-invocation-sub-flow"/>	
+		<async doc:name="Async" doc:id="cadf0c66-b280-4827-8c18-12254486e0a2">
+            <flow-ref doc:name="Post Assets Purge" doc:id="6f4a054d-63c1-4bfe-becd-b3d816272c9e" name="post-assets-purge-flow" />
+        </async>
+        <ee:transform doc:name="Transform Message" doc:id="56e742df-9705-4e74-a64d-5d2761b5f677">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"status": "Asset Purge in progress. Use " ++ correlationId ++ " to search the logs"
+}]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+    </flow>
+    <flow name="post:\management-plane\assets\migrate\rollback:application\json:anypoint-platform-magement-utility-config">
+        <flow-ref doc:name="Common-invocation" doc:id="ea382790-5699-4355-a232-226618b01c71" name="common-invocation-sub-flow"/>
+		<set-variable value="rollback" doc:name="Set Confirmation Type" doc:id="e7fc61f6-c5ed-422a-8959-67d6a23aa970" variableName="confirmationType" />
+        <async doc:name="Async" doc:id="306b0bd4-33f7-4ee4-a458-d066c100d518">
+            <flow-ref doc:name="Post Assets Migrate - Rollback" doc:id="67659d7e-cd71-4d86-9f42-e4f5e923c51d" name="post-assets-migrate-rollback-or-commit-flow" />
+        </async>
+        <ee:transform doc:name="Transform Message" doc:id="01c6a69d-ee9b-4665-9339-f0468633445f">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"status": "Asset Migration - Rollback in progress. Use " ++ correlationId ++ " to search the logs"
+}]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+    </flow>
+</mule>

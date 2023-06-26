@@ -1,0 +1,279 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd 
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd">
+	<sub-flow name="post-assets-migrate-designcenter-sub-flow" doc:id="d3aac4ec-63cb-4471-aa27-fcb99128ecb0" >
+		<logger level="INFO" doc:name="Logger" doc:id="a2e64733-5b29-4ab6-ab02-372a06a6493d" message='#["Design Center Asset Migration for " ++ payload.designCenterAssetName]'/>
+		<set-variable value="#[payload.designCenterAssetName]" doc:name="Set Design Center Asset Name" doc:id="66499c90-1761-4c63-97e2-b900cfabf6aa" variableName="dcAssetName" />
+		<set-variable value="#[payload.assetMinorVersionOverride]" doc:name="Set Asset Version Override" doc:id="f64e8fe7-72b8-4a98-b61f-9e975ee9031f" variableName="assetVersionOverride"/>
+		<http:request method="GET" doc:name="Get Owner" doc:id="08b765d8-9c12-4982-b2d8-3b7383b7fece" config-ref="api_httpRequestConfig" path="${anypoint.platform.api.path.profile}" target="assetOwnerId" targetValue="#[payload.user.id]">
+					<http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : vars.authorizationHeader
+}]]]></http:headers>
+		</http:request>
+		<http:request method="GET" doc:name="Get Source Design Center Projects (Filter By Name)" doc:id="9c4faa2b-91a2-4c22-a117-9ce095ed59a0" config-ref="api_httpRequestConfig" path="${anypoint.platform.api.path.designcenter.projects}">
+					<http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : vars.authorizationHeader,
+	"x-organization-id": vars.fromBGId,
+	"x-owner-id": vars.assetOwnerId
+}]]]></http:headers>
+				</http:request>
+		<set-variable value="#[(payload filter $.name == vars.dcAssetName)[0]]" doc:name="Set Design Center Asset Info" doc:id="14192d1f-ed87-496f-b1f2-48bb82e5a6b9" variableName="dcAssetInfo" />
+
+		<choice doc:name="Choice" doc:id="a1540169-ee05-4303-84fd-68b2123a5d5a" >
+			<when expression="#[vars.dcAssetInfo.name != null]">
+				<http:request method="GET" doc:name="Get Source Design Center File List" doc:id="c2f03202-4fa4-44bb-99a9-186f23c8d0e5" config-ref="api_httpRequestConfig" path="${anypoint.platform.api.path.designcenter.files}">
+					<http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : vars.authorizationHeader,
+	"x-organization-id": vars.fromBGId,
+	"x-owner-id": vars.assetOwnerId
+}]]]></http:headers>
+					<http:uri-params><![CDATA[#[output application/java
+---
+{
+	"projectId" : vars.dcAssetInfo.id,
+	"branch": '${anypoint.platform.designcenter.branch}'
+}]]]></http:uri-params>
+				
+</http:request>
+				<parallel-foreach doc:name="Parallel For Each" doc:id="269e4edd-2577-4b43-9a4b-9b4053d277a1" collection='#[payload filter ($."type" == "FILE" and !($.path matches "exchange_modules.*"))]'>
+					<http:request method="GET" doc:name="Get Source Design Center File Content" doc:id="20bbe8b1-b40d-4aba-8c89-7ecaa12ce729" config-ref="api_httpRequestConfig" path="${anypoint.platform.api.path.designcenter.file-content}" target="fileContent" outputMimeType="text/plain" targetValue="#[input payload text/plain --- payload]">
+					<http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : vars.authorizationHeader,
+	"x-organization-id": vars.fromBGId,
+	"x-owner-id": vars.assetOwnerId
+}]]]></http:headers>
+					<http:uri-params><![CDATA[#[output application/java
+---
+{
+	"projectId" : vars.dcAssetInfo.id,
+	"branch": '${anypoint.platform.designcenter.branch}',
+	"filePath": payload.path replace "/" with "%2F"
+}]]]></http:uri-params>
+				
+</http:request>
+					<choice doc:name="Choice" doc:id="ec2896a8-c0e6-4a95-b140-e968c60139c2">
+						<when expression='#[payload.path == "exchange.json"]'>
+					
+					<ee:transform doc:name="Modify exchange.json" doc:id="a083b052-a9f3-4b38-b933-fb1065728afa">
+					<ee:message>
+						<ee:set-payload><![CDATA[%dw 2.0
+output application/java
+---
+{
+	"path": payload.path,
+	"content": write(
+		read(vars.fileContent, 'application/json') update {
+			case .groupId! -> vars.toBGId
+			case version at .version! -> if (vars.assetVersionOverride != null) vars.assetVersionOverride ++ "." ++ (version splitBy ".")[2] else version
+		}, 'application/json')
+} 
+
+]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+						</when>
+						<otherwise>
+							<ee:transform doc:name="Create File Save Requests" doc:id="828f4945-8e38-4265-a6ca-7791fd5a48e9">
+					<ee:message>
+						<ee:set-payload><![CDATA[%dw 2.0
+output application/java
+---
+{
+	"path": payload.path,
+	"content": vars.fileContent
+}]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+						</otherwise>
+					</choice>
+				</parallel-foreach>
+				<ee:transform doc:name="Aggregate File Save Requests" doc:id="57ef9ee2-a403-47c6-951f-1653c20b864d">
+					<ee:message>
+						<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+payload map (
+	$.payload
+)]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+				<http:request method="POST" doc:name="Create Target Design Center Project" doc:id="4b8cf293-4851-4473-ad67-003d8ebd75fb" config-ref="api_httpRequestConfig" path="${anypoint.platform.api.path.designcenter.projects}" target="createProjectResponse">
+					<http:body><![CDATA[#[{
+	"name": vars.dcAssetInfo.name,
+	"classifier": "raml",
+	"type": vars.dcAssetInfo."type"
+}]]]></http:body>
+					<http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : vars.authorizationHeader,
+	"x-organization-id": vars.toBGId,
+	"x-owner-id": vars.assetOwnerId
+}]]]></http:headers>
+				
+</http:request>
+				<http:request method="POST" doc:name="Lock Target Design Center Project" doc:id="ec8fe3b5-224e-48d6-8cca-e4f4ab66c0c6" config-ref="api_httpRequestConfig" path="${anypoint.platform.api.path.designcenter.lock}" target="lockProjectResponse">
+					<http:body><![CDATA[#[{}]]]></http:body>
+					<http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : vars.authorizationHeader,
+	"x-organization-id": vars.toBGId,
+	"x-owner-id": vars.assetOwnerId
+}]]]></http:headers>
+			<http:uri-params><![CDATA[#[output application/java
+---
+{
+	"projectId" : vars.createProjectResponse.id,
+	"branch": '${anypoint.platform.designcenter.branch}'
+}]]]></http:uri-params>
+				
+</http:request>
+				<http:request method="POST" doc:name="Save Target Design Center Project Files" doc:id="11892ec0-8f60-40f7-b926-bee468e7fe56" config-ref="api_httpRequestConfig" path="${anypoint.platform.api.path.designcenter.save}" target="saveFilesResponse">
+					<http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : vars.authorizationHeader,
+	"x-organization-id": vars.toBGId,
+	"x-owner-id": vars.assetOwnerId,
+	"Content-Type": "application/json"
+}]]]></http:headers>
+			<http:uri-params><![CDATA[#[output application/java
+---
+{
+	"projectId" : vars.createProjectResponse.id,
+	"branch": '${anypoint.platform.designcenter.branch}'
+}]]]></http:uri-params>
+				
+
+</http:request>
+				<http:request method="PUT" doc:name="Rename Source Design Center Project" doc:id="ebe19a0b-9610-4d2d-ac6e-3af2717b4335" config-ref="api_httpRequestConfig" path="${anypoint.platform.api.path.designcenter.rename}" target="saveFilesResponse">
+											<http:body><![CDATA[#[{
+  "name": "MIGRATED-DO-NOT-CHANGE-" ++ vars.dcAssetInfo.name
+}]]]></http:body>
+						<http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : vars.authorizationHeader,
+	"x-organization-id": vars.fromBGId,
+	"x-owner-id": vars.assetOwnerId,
+	"Content-Type": "application/json"
+}]]]></http:headers>
+									<http:uri-params><![CDATA[#[output application/java
+---
+{
+	"projectId" : vars.dcAssetInfo.id
+}]]]></http:uri-params>
+										
+						</http:request>
+				<logger level="INFO" doc:name="Logger" doc:id="eb6a66f2-4f54-48af-bd11-225121547e40" message="#[vars.createProjectResponse]"/>
+			
+</when>
+			<otherwise >
+				<logger level="INFO" doc:name="Logger" doc:id="7c3f69d9-18a0-460b-8750-652f97a98fe2" message="No Design Center Asset found to migrate"/>
+			</otherwise>
+		</choice>
+
+	
+</sub-flow>
+<sub-flow name="post-assets-migrate-rollback-or-commit-designcenter-sub-flow" doc:id="b5b3902e-38f3-45a3-9321-e190f50afd78" >
+		<logger level="INFO" doc:name="Logger" doc:id="2b9c50f1-7364-4b40-9630-2ec4474091b2" message='#[output application/java&#10;---&#10;"Design Center Asset Migration " ++ vars.confirmationType ++ " for " ++ payload.designCenterAssetName]'/>
+		<set-variable value='#["MIGRATED-DO-NOT-CHANGE-" ++ payload.designCenterAssetName]' doc:name="Set Source Design Center Asset Name" doc:id="9b85a19d-6329-40d9-9362-4cdd78304bd7" variableName="dcSourceAssetName" />
+		<set-variable value="#[payload.designCenterAssetName]" doc:name="Set Target Design Center Asset Name" doc:id="2500eb4e-82c5-466e-8a73-aec6205c2f90" variableName="dcTargetAssetName"/>
+		<scatter-gather doc:name="Scatter-Gather" doc:id="7ba1c31c-d294-40f8-ad6a-f85a9178c4e3" >
+			<route >
+				<http:request method="GET" doc:name="Get Source Design Center Projects (Filter by Name)" doc:id="3a6a657b-cc26-4e10-b8e8-b152a3d46128" config-ref="api_httpRequestConfig" path="${anypoint.platform.api.path.designcenter.projects}">
+					<http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : vars.authorizationHeader,
+	"x-organization-id": vars.fromBGId
+}]]]></http:headers>
+				</http:request>
+				<set-variable value="#[(payload filter $.name == vars.dcSourceAssetName)[0]]" doc:name="Set Source Design Center Asset Info" doc:id="992f8d6e-effa-4f7c-80aa-7c5c826d0237" variableName="dcSourceAssetInfo" />
+			</route>
+			<route >
+				<http:request method="GET" doc:name="Get Target Design Center Projects (Filter by Name)" doc:id="c0e87164-3277-4eb6-8123-48d5e4a0995f" config-ref="api_httpRequestConfig" path="${anypoint.platform.api.path.designcenter.projects}">
+			<http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : vars.authorizationHeader,
+	"x-organization-id": vars.toBGId
+}]]]></http:headers>
+		</http:request>
+				<set-variable value="#[(payload filter $.name == vars.dcTargetAssetName)[0]]" doc:name="Set Target Design Center Asset Info" doc:id="6720c2df-bef2-44ca-81b0-991b906de233" variableName="dcTargetAssetInfo" />
+			</route>
+		</scatter-gather>
+		<choice doc:name="Choice" doc:id="7c0fc839-b911-4953-9a12-83631d6015b3" >
+			<when expression="#[vars.dcTargetAssetInfo.name != null]">
+				<choice doc:name="Choice" doc:id="b57f4b41-4258-4de4-864c-8524d4396fcd" >
+					<when expression="#[vars.dcSourceAssetInfo.name != null]">
+						<choice doc:name="Choice" doc:id="b22bc596-9aef-46ee-a15c-0da0a792d1ed">
+							<when expression='#[vars.confirmationType == "commit"]'>
+								<set-variable value="#[vars.fromBGId]" doc:name="Set Delete BG Id" doc:id="394e70e1-51e5-4a35-9bd1-b3324547a924" variableName="deleteBGId"/>
+								<set-variable value="#[vars.dcSourceAssetInfo.id]" doc:name="Set Delete Asset Id" doc:id="d29ca2d3-f0be-471c-a623-44a1d3c959ba" variableName="deleteAssetId"/>
+							</when>
+							<otherwise >
+								<http:request method="PUT" doc:name="Rename Source Design Center Project" doc:id="63400cd6-7c05-4394-87f7-3d12fed992e5" config-ref="api_httpRequestConfig" path="${anypoint.platform.api.path.designcenter.rename}" target="saveFilesResponse">
+											<http:body><![CDATA[#[{
+  "name": vars.dcTargetAssetName
+}]]]></http:body>
+						<http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : vars.authorizationHeader,
+	"x-organization-id": vars.fromBGId,
+	"Content-Type": "application/json"
+}]]]></http:headers>
+									<http:uri-params><![CDATA[#[output application/java
+---
+{
+	"projectId" : vars.dcSourceAssetInfo.id
+}]]]></http:uri-params>
+										
+						</http:request>
+								<set-variable value="#[vars.toBGId]" doc:name="Set Delete BG Id" doc:id="2d510501-562b-49d0-b21d-a0bff66e6d32" variableName="deleteBGId"/>
+								<set-variable value="#[vars.dcTargetAssetInfo.id]" doc:name="Set Delete Asset Id" doc:id="ce03c093-3e20-4bed-83b7-90e1e4791cc1" variableName="deleteAssetId"/>
+							</otherwise>
+						</choice>
+						<http:request method="DELETE" doc:name="Delete Design Center Project" doc:id="10083b84-4f8f-4c2f-803a-b2815b2fa73d" config-ref="api_httpRequestConfig" path="${anypoint.platform.api.path.designcenter.projects}/{projectId}">
+					<http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : vars.authorizationHeader,
+	"x-organization-id": vars.deleteBGId
+}]]]></http:headers>
+					<http:uri-params><![CDATA[#[output application/java
+---
+{
+	"projectId" : vars.deleteAssetId
+}]]]></http:uri-params>
+				
+</http:request>
+						<logger level="INFO" doc:name="Logger" doc:id="e5130552-28dd-41b1-8e7c-c335c32340b6" message='#[output application/java&#10;---&#10;"Project Id - " ++ vars.deleteAssetId ++ " deleted from Business Group Id - " ++ vars.deleteBGId]'/>
+					</when>
+					<otherwise >
+						<logger level="INFO" doc:name="Logger" doc:id="d390567e-9412-42bd-9ad5-7242f5c1f360" message='#["No Source Design Center Asset found to " ++ vars.confirmationType]'/>
+					</otherwise>
+				</choice>
+			</when>
+			<otherwise>
+				<logger level="INFO" doc:name="Logger" doc:id="07346e6b-6918-497a-991a-af86bb5df8aa" message='#["No Target Design Center Asset found to " ++ vars.confirmationType]'/>
+			</otherwise>
+		</choice>
+	</sub-flow>	
+</mule>

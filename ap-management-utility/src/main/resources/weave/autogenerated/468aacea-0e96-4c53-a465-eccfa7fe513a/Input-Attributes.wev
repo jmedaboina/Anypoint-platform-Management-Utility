@@ -1,0 +1,26 @@
+%dw 2.0
+
+type auto_468aacea_0e96_4c53_a465_eccfa7fe513a_Input_Attributes = {|
+  clientCertificate?: {|
+    publicKey?: {|  |}, 
+    "type"?: String, 
+    encoded?: Binary
+  |}, 
+  headers: {|  |}, 
+  listenerPath: String, 
+  method: String, 
+  queryParams: {|
+    businessGroups?: Array<String> {"description": "The list of business groups to filter the operation"}, 
+    environments?: Array<String> {"description": "The list of environments to filter the operation"}
+  |}, 
+  queryString: String, 
+  relativePath: String, 
+  remoteAddress: String, 
+  requestPath: String, 
+  requestUri: String, 
+  scheme: String, 
+  uriParams: {|  |}, 
+  version: String, 
+  localAddress: String
+|}
+
